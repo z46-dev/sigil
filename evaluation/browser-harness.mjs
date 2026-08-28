@@ -10,6 +10,7 @@ const repeats = Number.parseInt(process.env.SIGIL_EVALUATION_REPEATS || "2", 10)
 const requestedBrowsers = (process.env.SIGIL_EVALUATION_BROWSERS || "chromium,firefox,webkit").split(",");
 const browserTypes = { chromium, firefox, webkit };
 const contentTypes = {
+    ".css": "text/css; charset=utf-8",
     ".html": "text/html; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
     ".wasm": "application/wasm",
@@ -46,6 +47,7 @@ const startServer = async () => {
 const collect = async (context, url, browser, scenario, label) => {
     const page = await context.newPage();
     try {
+        await page.addInitScript(() => localStorage.setItem("sigil-fingerprinting-consent-v1", "accepted"));
         await page.goto(url);
         await page.waitForFunction(() => Boolean(window.sigil?.collect));
         return {

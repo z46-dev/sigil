@@ -139,6 +139,17 @@ func updateVisitor(identifier, observedAt string) (err error) {
 	return
 }
 
+func alreadyObserved(candidates []service.MatchCandidate, visitorID, snapshotID string) (found bool) {
+	for _, candidate := range candidates {
+		if candidate.VisitorID == visitorID && candidate.SnapshotID == snapshotID {
+			found = true
+			return
+		}
+	}
+
+	return
+}
+
 // MatchAndRecord reconciles a validated snapshot and durably records non-ambiguous decisions.
 func MatchAndRecord(snapshot service.Snapshot) (result service.MatchResult, err error) {
 	matchMutex.Lock()
@@ -184,6 +195,10 @@ func MatchAndRecord(snapshot service.Snapshot) (result service.MatchResult, err 
 			return
 		}
 	} else if err = updateVisitor(result.VisitorID, observedAt); err != nil {
+		return
+	}
+
+	if alreadyObserved(candidates, result.VisitorID, snapshot.SnapshotID) {
 		return
 	}
 

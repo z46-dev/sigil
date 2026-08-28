@@ -63,7 +63,7 @@ func databaseTestSnapshot(t *testing.T) (snapshot service.Snapshot) {
 	return
 }
 
-// TestMatchAndRecord verifies a durable visitor is created and reused.
+// TestMatchAndRecord verifies a visitor is reused without duplicating an identical observation.
 func TestMatchAndRecord(t *testing.T) {
 	var (
 		testDriver  *gosqlite.Driver = initializeTestDatabase(t)
@@ -102,7 +102,7 @@ func TestMatchAndRecord(t *testing.T) {
 		t.Fatalf("list observations: %v", err)
 	}
 
-	if len(fingerprints) != 1 || fingerprints[0].ObservationCount != 2 || len(observations) != 2 {
+	if len(fingerprints) != 1 || fingerprints[0].ObservationCount != 2 || len(observations) != 1 {
 		t.Fatalf("unexpected persistence state: fingerprints=%+v observations=%+v", fingerprints, observations)
 	}
 }

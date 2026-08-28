@@ -1,11 +1,8 @@
 package app
 
 import (
-	"strings"
-
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/cors"
-	"github.com/gofiber/fiber/v3/middleware/csrf"
+	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/static"
 	"github.com/z46-dev/sigil/src/app/api"
 	"github.com/z46-dev/sigil/src/config"
@@ -13,27 +10,28 @@ import (
 
 var app *fiber.App
 
-func Start() (err error) {
-	app = fiber.New(fiber.Config{})
+// New builds the HTTP application without opening a listener.
+func New() (server *fiber.App) {
+	server = fiber.New(fiber.Config{})
 
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: config.Config.WebServer.CORSAllowedOrigins,
-		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization"},
+	server.Use(helmet.New(helmet.Config{
+		ContentSecurityPolicy:     "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self'; connect-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+		CrossOriginEmbedderPolicy: "unsafe-none",
+		XFrameOptions:             "DENY",
 	}))
 
-	if config.Config.WebServer.EnableCSRF {
-		app.Use(csrf.New(csrf.Config{
-			Next: func(ctx fiber.Ctx) bool {
-				return strings.HasPrefix(ctx.Path(), "/api")
-			},
-		}))
-	}
-
-	api.Init(app)
+	api.Init(server)
 
 	if config.Config.WebServer.ServePublicDir {
-		app.Get("/*", static.New("./client/public"))
+		server.Get("/*", static.New("./client/public"))
 	}
+
+	return
+}
+
+// Start builds and serves the configured HTTP application.
+func Start() (err error) {
+	app = New()
 
 	var listenConfig fiber.ListenConfig
 	if config.Config.WebServer.TLSDir != "" {

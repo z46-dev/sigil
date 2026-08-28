@@ -7,6 +7,11 @@ func validHash(value string) (valid bool) {
 	return
 }
 
+func validText(value string, maximum int) (valid bool) {
+	valid = len(value) <= maximum
+	return
+}
+
 // ValidateSnapshot verifies schema, scope, sizes, and the client-supplied content identifier.
 func ValidateSnapshot(snapshot Snapshot) (mode Mode, err error) {
 	var expected string
@@ -20,7 +25,10 @@ func ValidateSnapshot(snapshot Snapshot) (mode Mode, err error) {
 		return
 	}
 
-	if len(snapshot.Browser.UserAgent) > 1024 || len(snapshot.Browser.Platform) > 128 || len(snapshot.Browser.Vendor) > 256 {
+	if !validText(snapshot.Browser.UserAgent, 1024) || !validText(snapshot.Browser.Platform, 128) ||
+		!validText(snapshot.Browser.Vendor, 256) || !validText(snapshot.Browser.Timezone, 128) ||
+		!validText(snapshot.Browser.DoNotTrack, 64) || !validText(snapshot.Browser.Rendering.WebGLVendor, 512) ||
+		!validText(snapshot.Browser.Rendering.WebGLRenderer, 1024) {
 		err = fmt.Errorf("browser metadata exceeds size limits")
 		return
 	}
@@ -46,11 +54,14 @@ func ValidateSnapshot(snapshot Snapshot) (mode Mode, err error) {
 
 	if snapshot.Browser.ScreenWidth < 0 || snapshot.Browser.ScreenWidth > 32768 ||
 		snapshot.Browser.ScreenHeight < 0 || snapshot.Browser.ScreenHeight > 32768 ||
+		snapshot.Browser.AvailableWidth < 0 || snapshot.Browser.AvailableWidth > 32768 ||
+		snapshot.Browser.AvailableHeight < 0 || snapshot.Browser.AvailableHeight > 32768 ||
 		snapshot.Browser.ColorDepth < 0 || snapshot.Browser.ColorDepth > 128 ||
 		snapshot.Browser.PixelRatio < 0 || snapshot.Browser.PixelRatio > 16 ||
 		snapshot.Browser.HardwareConcurrency < 0 || snapshot.Browser.HardwareConcurrency > 1024 ||
 		snapshot.Browser.DeviceMemory < 0 || snapshot.Browser.DeviceMemory > 1024 ||
-		snapshot.Browser.MaxTouchPoints < 0 || snapshot.Browser.MaxTouchPoints > 100 {
+		snapshot.Browser.MaxTouchPoints < 0 || snapshot.Browser.MaxTouchPoints > 100 ||
+		snapshot.Browser.Fonts.DetectedCount < 0 || snapshot.Browser.Fonts.DetectedCount > 100_000 {
 		err = fmt.Errorf("numeric browser signal is outside accepted range")
 		return
 	}

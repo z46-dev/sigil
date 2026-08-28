@@ -1,27 +1,79 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 
 <head>
-    <title>sigil example</title>
-    <style>
-        html, body, canvas {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-    </style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sigil browser fingerprint</title>
+    <meta name="description" content="Inspect the browser signals and fingerprint collected by Sigil.">
+    <link rel="stylesheet" href="./styles.css">
     <script src="./wasm_exec.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.12.0/highlight.min.js" defer></script>
+    <script src="./app.js" type="module"></script>
 </head>
 
-<body oncontextmenu="return;">
-    <script defer>
-        document.addEventListener("DOMContentLoaded", () => {
-            const go = new Go();
-            WebAssembly.instantiateStreaming(fetch("./main.wasm"), go.importObject).then(result => go.run(result.instance));
-        });
-    </script>
+<body>
+    <main>
+        <header>
+            <p class="eyebrow">Sigil</p>
+            <h1>Your browser fingerprint</h1>
+            <p class="introduction">
+                Browser fingerprinting combines details exposed by your browser and device, such as your screen,
+                graphics hardware, fonts, and language, to recognize repeat visits without relying only on cookies.
+                Read more from <a href="https://coveryourtracks.eff.org/learn" rel="noreferrer">EFF's Cover Your Tracks</a>.
+            </p>
+        </header>
+
+        <section aria-labelledby="result-heading">
+            <div class="section-heading">
+                <h2 id="result-heading">Result</h2>
+                <button id="collect-button" type="button">Collect again</button>
+            </div>
+
+            <p id="status" class="status" role="status" aria-live="polite">Loading the browser collector…</p>
+
+            <dl class="identifiers" hidden id="identifiers">
+                <div>
+                    <dt>Visitor ID</dt>
+                    <dd><code id="visitor-id"></code></dd>
+                </div>
+                <div>
+                    <dt>Snapshot ID</dt>
+                    <dd><code id="snapshot-id"></code></dd>
+                </div>
+                <div>
+                    <dt>Decision</dt>
+                    <dd id="decision"></dd>
+                </div>
+            </dl>
+        </section>
+
+        <section aria-labelledby="data-heading">
+            <h2 id="data-heading">Collected data</h2>
+            <p class="supporting-text">This is the snapshot sent to <code>./api/v1/identify</code> and the server response.</p>
+            <pre><code id="collected-data" class="language-json">Waiting for collection…</code></pre>
+        </section>
+
+        <footer>
+            <button id="consent-control" type="button">Revoke consent</button>
+        </footer>
+    </main>
+
+    <dialog id="consent-dialog" aria-labelledby="consent-heading" aria-describedby="consent-description">
+        <form method="dialog">
+            <p class="eyebrow">Your choice</p>
+            <h2 id="consent-heading">Allow browser fingerprinting?</h2>
+            <p id="consent-description">
+                Sigil will collect browser and device characteristics, send them to this server, and store them to
+                recognize repeat visits. This includes screen, hardware, browser, graphics, audio, font, language,
+                and timezone signals. You can decline and continue reading this page without collection.
+            </p>
+            <div class="consent-actions">
+                <button id="decline-consent" type="button">Decline</button>
+                <button id="accept-consent" class="primary-action" type="button">Allow fingerprinting</button>
+            </div>
+        </form>
+    </dialog>
 </body>
 
 </html>
