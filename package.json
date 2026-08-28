@@ -1,0 +1,12 @@
+{
+    "name": "sigil-evaluation",
+    "private": true,
+    "scripts": {
+        "evaluate:collect": "node evaluation/browser-harness.mjs",
+        "evaluate:report": "go run ./evaluation/cmd",
+        "evaluate": "npm run evaluate:collect && npm run evaluate:report"
+    },
+    "devDependencies": {
+        "playwright": "latest"
+    }
+}

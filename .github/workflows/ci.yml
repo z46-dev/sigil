@@ -1,0 +1,173 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Install gopls
+        run: go install golang.org/x/tools/gopls@latest
+
+      - name: Run native gopls quality checks
+        shell: bash
+        run: |
+          go list -f '{{range .GoFiles}}{{$.Dir}}/{{.}} {{end}}{{range .TestGoFiles}}{{$.Dir}}/{{.}} {{end}}' ./... |
+            xargs -r gopls check
+
+      - name: Run WASM gopls quality checks
+        shell: bash
+        run: |
+          GOOS=js GOARCH=wasm go list -f '{{range .GoFiles}}{{$.Dir}}/{{.}} {{end}}{{range .TestGoFiles}}{{$.Dir}}/{{.}} {{end}}' ./client/... ./service/... |
+            xargs -r env GOOS=js GOARCH=wasm gopls check
+
+      - name: Check Go formatting
+        shell: bash
+        run: |
+          files="$(find . -path ./.git -prune -o -type f -name '*.go' -print0 | xargs -0 -r gofmt -l)"
+          if [[ -n "$files" ]]; then
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Check module files
+        run: go mod tidy -diff
+
+      - name: Check native Go correctness
+        run: go vet ./...
+
+      - name: Run native tests
+        run: go test ./...
+
+      - name: Check WASM Go correctness
+        run: GOOS=js GOARCH=wasm go vet ./client/... ./service/...
+
+      - name: Build browser agent
+        run: bash ./scripts/build.sh
+
+  vulnerability-scan:
+    name: Vulnerability scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Scan Go dependencies and code
+        uses: golang/govulncheck-action@v1
+        with:
+          repo-checkout: false
+          go-version-file: go.mod
+          go-package: ./...
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Run Go security analysis
+        run: gosec -exclude-generated ./...
+
+      - name: Run WASM Go security analysis
+        # WASM is limited to 32-bit lengths.
+        run: GOOS=js GOARCH=wasm gosec -exclude=G115 -exclude-generated ./client/... ./service/...
+
+  browser-evaluation:
+    name: Longitudinal browser evaluation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Build browser agent
+        run: bash ./scripts/build.sh
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install evaluation dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Run longitudinal evaluation
+        run: npm run evaluate
+
+      - name: Upload evaluation report
+        if: ${{ !env.ACT }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-evaluation-${{ github.run_id }}
+          path: evaluation/reports/latest.json
+          if-no-files-found: error
+          retention-days: 30
+
+  tag:
+    name: Tag successful main build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - build-and-test
+      - vulnerability-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Create next patch tag
+        shell: bash
+        run: |
+          latest_tag="$(git tag --list | awk '/^v[0-9]+\.[0-9]+\.[0-9]+$/' | sort -V | tail -n 1)"
+          if [[ "$latest_tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            next_tag="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))"
+          else
+            next_tag="v0.0.1"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag --annotate "$next_tag" --message "Release $next_tag"
+          git push origin "$next_tag"
