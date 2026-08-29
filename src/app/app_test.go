@@ -40,7 +40,7 @@ func TestSecurityBoundary(t *testing.T) {
 	if response, err = server.Test(request); err != nil {
 		t.Fatalf("request cross-site challenge: %v", err)
 	}
-	
+
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusForbidden {
