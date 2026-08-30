@@ -50,6 +50,24 @@ go run ./src
 
 The server listens on `127.0.0.1:8080` by default. Configuration is stored in `config.toml`.
 
+### Install as a systemd service
+
+On a Linux system with Go, systemd, and `setcap` installed, run:
+
+```bash
+sudo bash ./scripts/install-systemd.sh
+```
+
+The installer builds the server and WebAssembly client, creates a non-login `sigil` system user, and installs the binary, `client/public`, configuration, MMDB archives, and any existing databases under `/opt/sigil`. It grants only `CAP_NET_BIND_SERVICE` to the binary so the unprivileged service can listen on ports below 1024. The systemd unit is enabled and started automatically.
+
+Reinstalling preserves `/opt/sigil/config.toml` and existing databases. To replace the deployed configuration with the repository copy, use:
+
+```bash
+sudo bash ./scripts/install-systemd.sh --overwrite-config
+```
+
+Use `--no-start` to install and enable the unit without starting it. If configuration uses custom database paths, ensure those files and their parent directories are writable by the `sigil` user. View service logs with `journalctl -u sigil -f`.
+
 ### Server/network signals
 
 Server-observed network evidence is opt-in. When enabled, Sigil reduces the remote address to an IPv4 `/24` or IPv6 `/56` prefix and stores only an HMAC digest. The coarse digest contributes a small amount of matching evidence and also binds challenges to the requesting network. Raw IP addresses are not retained.
