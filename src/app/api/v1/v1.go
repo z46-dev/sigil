@@ -2,12 +2,17 @@ package v1
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
+	"net"
 	"net/url"
 	"strings"
 	"sync"
@@ -16,6 +21,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/z46-dev/sigil/service"
+	"github.com/z46-dev/sigil/service/ipevaluation"
+	"github.com/z46-dev/sigil/src/config"
 	"github.com/z46-dev/sigil/src/db"
 )
 
@@ -47,13 +54,13 @@ type (
 
 	challengeRecord struct {
 		expiresAt time.Time
-		userAgent string
+		binding   string
 	}
 )
 
 var challenges = challengeRegistry{challenges: make(map[string]challengeRecord)}
 
-func (registry *challengeRegistry) issue(now time.Time, userAgent string) (response challengeResponse, err error) {
+func (registry *challengeRegistry) issue(now time.Time, binding string) (response challengeResponse, err error) {
 	var random [24]byte
 
 	if _, err = rand.Read(random[:]); err != nil {
@@ -79,17 +86,74 @@ func (registry *challengeRegistry) issue(now time.Time, userAgent string) (respo
 		return
 	}
 
-	registry.challenges[response.Challenge] = challengeRecord{expiresAt: response.ExpiresAt, userAgent: userAgent}
+	registry.challenges[response.Challenge] = challengeRecord{expiresAt: response.ExpiresAt, binding: binding}
 	return
 }
 
-func (registry *challengeRegistry) consume(challenge string, now time.Time, userAgent string) (valid bool) {
+func (registry *challengeRegistry) consume(challenge string, now time.Time, binding string) (valid bool) {
 	registry.mutex.Lock()
 	defer registry.mutex.Unlock()
 
 	if record, exists := registry.challenges[challenge]; exists {
 		delete(registry.challenges, challenge)
-		valid = record.expiresAt.After(now) && record.userAgent == userAgent
+		valid = record.expiresAt.After(now) && hmac.Equal([]byte(record.binding), []byte(binding))
+	}
+
+	return
+}
+
+func networkPrefix(address string) (prefix []byte) {
+	var ip net.IP = net.ParseIP(address)
+	if ip == nil {
+		return
+	}
+
+	if ipv4 := ip.To4(); ipv4 != nil {
+		prefix = ipv4.Mask(net.CIDRMask(24, 32))
+	} else {
+		prefix = ip.Mask(net.CIDRMask(56, 128))
+	}
+
+	return
+}
+
+func serverSignals(ctx fiber.Ctx) (signals service.ServerSignals) {
+	signals.Protocol = ctx.Protocol()
+	signals.TLS = strings.EqualFold(ctx.Scheme(), "https")
+	if !config.Config.WebServer.ServerNetworkSignals {
+		return
+	}
+
+	var prefix []byte = networkPrefix(ctx.IP())
+	if len(prefix) == 0 {
+		return
+	}
+
+	var mac hash.Hash = hmac.New(sha256.New, []byte(config.Config.WebServer.NetworkSignalKey))
+	_, _ = mac.Write(prefix)
+	signals.NetworkPrefixHash = hex.EncodeToString(mac.Sum(nil))
+
+	var evaluation ipevaluation.Result
+	if evaluation, _ = ipevaluation.Evaluate(ctx.IP()); evaluation.ASN != 0 || evaluation.CountryCode != "" ||
+		evaluation.OpenProxy || evaluation.Tor || evaluation.Hosting || evaluation.Malicious {
+		signals.IP = service.IPClassification{
+			ASN:             evaluation.ASN,
+			ASNOrganization: evaluation.ASNOrganization,
+			CountryCode:     evaluation.CountryCode,
+			City:            evaluation.City,
+			OpenProxy:       evaluation.OpenProxy,
+			Tor:             evaluation.Tor,
+			Hosting:         evaluation.Hosting,
+			Malicious:       evaluation.Malicious,
+		}
+	}
+	return
+}
+
+func requestBinding(ctx fiber.Ctx) (binding string) {
+	binding = ctx.Get(fiber.HeaderUserAgent)
+	if signals := serverSignals(ctx); signals.NetworkPrefixHash != "" {
+		binding += "\x00" + signals.NetworkPrefixHash
 	}
 
 	return
@@ -128,7 +192,7 @@ func Challenge(ctx fiber.Ctx) (err error) {
 		return
 	}
 
-	if response, err = challenges.issue(time.Now().UTC(), ctx.Get(fiber.HeaderUserAgent)); err != nil {
+	if response, err = challenges.issue(time.Now().UTC(), requestBinding(ctx)); err != nil {
 		ctx.Status(fiber.StatusInternalServerError)
 		err = ctx.JSON(errorResponse{Error: "unable to issue challenge"})
 		return
@@ -190,7 +254,7 @@ func Identify(ctx fiber.Ctx) (err error) {
 		return
 	}
 
-	if !challenges.consume(request.Challenge, time.Now().UTC(), ctx.Get(fiber.HeaderUserAgent)) {
+	if !challenges.consume(request.Challenge, time.Now().UTC(), requestBinding(ctx)) {
 		ctx.Status(fiber.StatusUnauthorized)
 		err = ctx.JSON(errorResponse{Error: "challenge is invalid, expired, or already used"})
 		return
@@ -213,6 +277,8 @@ func Identify(ctx fiber.Ctx) (err error) {
 		err = ctx.JSON(errorResponse{Error: err.Error()})
 		return
 	}
+
+	request.Snapshot.Server = serverSignals(ctx)
 
 	if result, err = db.MatchAndRecord(request.Snapshot); err != nil {
 		ctx.Status(fiber.StatusInternalServerError)

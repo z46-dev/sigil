@@ -28,6 +28,33 @@ type (
 		WebGLExtensionsHash string `json:"webglExtensionsHash"`
 	}
 
+	// IPClassification contains server-derived network ownership and location data.
+	IPClassification struct {
+		ASN             uint   `json:"asn,omitempty"`
+		ASNOrganization string `json:"asnOrganization,omitempty"`
+		CountryCode     string `json:"countryCode,omitempty"`
+		City            string `json:"city,omitempty"`
+		OpenProxy       bool   `json:"openProxy"`
+		Tor             bool   `json:"tor"`
+		Hosting         bool   `json:"hosting"`
+		Malicious       bool   `json:"malicious"`
+	}
+
+	// ServerSignals contains trusted request properties observed by the server.
+	ServerSignals struct {
+		NetworkPrefixHash string           `json:"networkPrefixHash,omitempty"`
+		Protocol          string           `json:"protocol,omitempty"`
+		TLS               bool             `json:"tls"`
+		IP                IPClassification `json:"ip,omitempty"`
+	}
+
+	// Aggressiveness describes the privacy impact of the signals used for a match.
+	Aggressiveness struct {
+		Score       int    `json:"score"`
+		Level       string `json:"level"`
+		SignalCount int    `json:"signalCount"`
+	}
+
 	// Fingerprint stores the durable server-side identity assigned to a visitor.
 	Fingerprint struct {
 		ID               int    `json:"id" gosqlite:"id,primary,increment"`
@@ -45,6 +72,7 @@ type (
 		SnapshotID  string `json:"snapshotId" gosqlite:"snapshot_id"`
 		Mode        Mode   `json:"mode" gosqlite:"mode"`
 		SignalsJSON string `json:"-" gosqlite:"signals_json"`
+		ServerJSON  string `json:"-" gosqlite:"server_json"`
 		ObservedAt  string `json:"observedAt" gosqlite:"observed_at"`
 	}
 
@@ -81,6 +109,7 @@ type (
 		Scope         string         `json:"scope"`
 		CollectedAt   time.Time      `json:"collectedAt"`
 		Browser       BrowserSignals `json:"browser"`
+		Server        ServerSignals  `json:"-"`
 		mode          Mode
 	}
 )

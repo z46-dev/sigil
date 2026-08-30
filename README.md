@@ -5,7 +5,7 @@
 
 Sigil is an experimental, self-hosted browser fingerprinting service written in Go targeting WebAssembly. It collects permissionless browser signals, creates snapshot IDs, and uses server-side history to assign durable visitor IDs.
 
-Sigil is a research-quality project, not a production fraud-prevention platform. Its current single-machine Playwright baseline achieved 66.7% accuracy with a 40% false-new rate. The API has strict validation, rate limits, same-origin checks, and single-use challenges, but browser signals remain attacker-controlled. Authentication, automatic retention, and server-observed network signals are not implemented.
+Sigil is a research-quality project, not a production fraud-prevention platform. Its current single-machine Playwright baseline achieved 66.7% accuracy with a 40% false-new rate. The API has strict validation, rate limits, same-origin checks, and network-bound single-use challenges, but browser signals remain attacker-controlled. Authentication and automatic retention are not implemented.
 
 Sigil is worth more (and was designed) for research and education than for production use, but I am hoping to improve it over time and get it to a point where it can be used in production. If you are interested in contributing, feel free to open an issue or a pull request!
 
@@ -20,8 +20,8 @@ Legend: ✅ fully supported · ⚠️ partial or experimental · ❌ not support
 | Browser fingerprint | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Server-side visitor history | ✅ | ❌ | ❌ | ✅ | ✅ |
 | Cross-browser matching | ⚠️ | ❌ | ❌ | ❌ | ❌ |
-| Server/network signals | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Bot and fraud signals | ❌ | ❌ | ⚠️ | ✅ | ✅ |
+| Server/network signals | ⚠️ | ❌ | ❌ | ✅ | ✅ |
+| Bot and fraud signals | ⚠️ | ❌ | ⚠️ | ✅ | ✅ |
 | Native mobile SDKs | ❌ | ❌ | ❌ | ✅ | ❌ |
 | Tamper and replay protection | ⚠️ | ❌ | ❌ | ✅ | ⚠️ |
 | Production-calibrated accuracy | ❌ | ⚠️ | ⚠️ | ✅ | ✅ |
@@ -49,6 +49,34 @@ go run ./src
 ```
 
 The server listens on `127.0.0.1:8080` by default. Configuration is stored in `config.toml`.
+
+### Server/network signals
+
+Server-observed network evidence is opt-in. When enabled, Sigil reduces the remote address to an IPv4 `/24` or IPv6 `/56` prefix and stores only an HMAC digest. The coarse digest contributes a small amount of matching evidence and also binds challenges to the requesting network. Raw IP addresses are not retained.
+
+```toml
+[web_server]
+server_network_signals = true
+network_signal_key = "replace-with-at-least-32-random-characters"
+ip_data_directory = "data"
+trusted_proxies = ["127.0.0.1"] # Only when HTTPS terminates at a local reverse proxy.
+
+[ip_intelligence]
+database_file = "ip-intelligence.db"
+threatfox_auth_key = "" # Optional abuse.ch key.
+```
+
+Keep `network_signal_key` private and stable; changing it makes old network observations incomparable. List only proxy IPs or CIDRs you control in `trusted_proxies`. An empty list uses the direct TCP peer and ignores spoofable forwarding headers.
+
+Place the downloaded `GeoLite2-ASN_YYYYMMDD.tar.gz`, `GeoLite2-City_YYYYMMDD.tar.gz`, and `GeoLite2-Country_YYYYMMDD.tar.gz` archives in `ip_data_directory`. Sigil selects the newest matching archive, reads its MMDB member directly into memory, and never writes an extracted copy to disk. The default `data` directory is ignored by Git. ASN organization, country, and city are returned as an `ip` classification and persisted with the server observation; the raw address is discarded after evaluation.
+
+Sigil also maintains `ip-intelligence.db` separately from the visitor database. Published feeds are normalized into expiring CIDR indicators in SQLite, while request-time lookups use immutable in-memory prefix indexes. Successful updates atomically replace one source; failed or empty updates retain the last good snapshot. The updater currently consumes ProxyScrape, Tor Onionoo with a FireHOL Tor fallback, AWS, Google Cloud, Azure, Cloudflare, and FireHOL's proxy aggregate. ThreatFox malware indicators are enabled when `threatfox_auth_key` is configured.
+
+Source schedules reflect their expected volatility: ProxyScrape every 15 minutes, Tor and ThreatFox hourly, cloud ranges every 12 hours, and FireHOL proxies daily. Classifications remain separate—`openProxy`, `tor`, `hosting`, and `malicious`—because a cloud address is not proof of VPN use or abuse. Feed data has its own upstream terms and may contain false positives; review each source's terms before commercial deployment.
+
+Identification responses include an `aggressiveness` object with a `0`–`100` score, a `low`, `moderate`, or `high` level, and the number of signals used. This is a transparent privacy-intensity estimate based on available weighted probes; it is not an accuracy or uniqueness claim.
+
+Challenges expire after two minutes, are single-use, are bound to the observed user agent and (when enabled) coarse network prefix, and identification rejects stale collection timestamps, mismatched user agents, unknown JSON fields, and snapshot IDs that do not match their signal content. HTTPS is still required to protect requests in transit. These controls detect accidental or in-transit alteration and basic replay; they cannot make data supplied by a malicious browser trustworthy.
 
 ## Verify
 

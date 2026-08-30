@@ -102,15 +102,24 @@ func loadCandidates(mode service.Mode) (candidates []service.MatchCandidate, err
 		}
 
 		var signals service.BrowserSignals
+		var serverSignals service.ServerSignals
 		if err = json.Unmarshal([]byte(observation.SignalsJSON), &signals); err != nil {
 			err = fmt.Errorf("decode observation %d: %w", observation.ID, err)
 			return
+		}
+
+		if observation.ServerJSON != "" {
+			if err = json.Unmarshal([]byte(observation.ServerJSON), &serverSignals); err != nil {
+				err = fmt.Errorf("decode server observation %d: %w", observation.ID, err)
+				return
+			}
 		}
 
 		candidates = append(candidates, service.MatchCandidate{
 			VisitorID:  observation.VisitorID,
 			SnapshotID: observation.SnapshotID,
 			Signals:    signals,
+			Server:     serverSignals,
 		})
 	}
 
@@ -139,9 +148,9 @@ func updateVisitor(identifier, observedAt string) (err error) {
 	return
 }
 
-func alreadyObserved(candidates []service.MatchCandidate, visitorID, snapshotID string) (found bool) {
+func alreadyObserved(candidates []service.MatchCandidate, visitorID, snapshotID string, server service.ServerSignals) (found bool) {
 	for _, candidate := range candidates {
-		if candidate.VisitorID == visitorID && candidate.SnapshotID == snapshotID {
+		if candidate.VisitorID == visitorID && candidate.SnapshotID == snapshotID && candidate.Server.NetworkPrefixHash == server.NetworkPrefixHash {
 			found = true
 			return
 		}
@@ -159,6 +168,7 @@ func MatchAndRecord(snapshot service.Snapshot) (result service.MatchResult, err 
 		mode       service.Mode
 		candidates []service.MatchCandidate
 		encoded    []byte
+		serverJSON []byte
 		observedAt string = time.Now().UTC().Format(time.RFC3339Nano)
 	)
 
@@ -198,11 +208,15 @@ func MatchAndRecord(snapshot service.Snapshot) (result service.MatchResult, err 
 		return
 	}
 
-	if alreadyObserved(candidates, result.VisitorID, snapshot.SnapshotID) {
+	if alreadyObserved(candidates, result.VisitorID, snapshot.SnapshotID, snapshot.Server) {
 		return
 	}
 
 	if encoded, err = json.Marshal(snapshot.Browser); err != nil {
+		return
+	}
+
+	if serverJSON, err = json.Marshal(snapshot.Server); err != nil {
 		return
 	}
 
@@ -211,6 +225,7 @@ func MatchAndRecord(snapshot service.Snapshot) (result service.MatchResult, err 
 		SnapshotID:  snapshot.SnapshotID,
 		Mode:        mode,
 		SignalsJSON: string(encoded),
+		ServerJSON:  string(serverJSON),
 		ObservedAt:  observedAt,
 	}); err != nil {
 		err = fmt.Errorf("insert observation: %w", err)

@@ -15,6 +15,7 @@ type (
 		VisitorID  string
 		SnapshotID string
 		Signals    BrowserSignals
+		Server     ServerSignals
 	}
 
 	// SignalEvidence explains one contribution to a candidate score.
@@ -35,16 +36,18 @@ type (
 
 	// MatchResult reports a conservative identity decision and collision measurements.
 	MatchResult struct {
-		Decision         string           `json:"decision"`
-		VisitorID        string           `json:"visitorId,omitempty"`
-		Confidence       float64          `json:"confidence"`
-		BestScore        float64          `json:"bestScore"`
-		RunnerUpScore    float64          `json:"runnerUpScore"`
-		Margin           float64          `json:"margin"`
-		EvidenceCoverage float64          `json:"evidenceCoverage"`
-		Collision        bool             `json:"collision"`
-		CandidateCount   int              `json:"candidateCount"`
-		Evidence         []SignalEvidence `json:"evidence,omitempty"`
+		Decision         string            `json:"decision"`
+		VisitorID        string            `json:"visitorId,omitempty"`
+		Confidence       float64           `json:"confidence"`
+		BestScore        float64           `json:"bestScore"`
+		RunnerUpScore    float64           `json:"runnerUpScore"`
+		Margin           float64           `json:"margin"`
+		EvidenceCoverage float64           `json:"evidenceCoverage"`
+		Collision        bool              `json:"collision"`
+		CandidateCount   int               `json:"candidateCount"`
+		Evidence         []SignalEvidence  `json:"evidence,omitempty"`
+		Aggressiveness   Aggressiveness    `json:"aggressiveness"`
+		IP               *IPClassification `json:"ip,omitempty"`
 	}
 
 	matcherScore struct {
@@ -138,6 +141,11 @@ func addBrowserEvidence(score *matcherScore, current, previous BrowserSignals) {
 	score.add("font-metrics", 7, current.Fonts.MetricsHash != "" && previous.Fonts.MetricsHash != "", sameString(current.Fonts.MetricsHash, previous.Fonts.MetricsHash))
 }
 
+func addServerEvidence(score *matcherScore, current, previous ServerSignals) {
+	score.add("network-prefix", 8, current.NetworkPrefixHash != "" && previous.NetworkPrefixHash != "", sameString(current.NetworkPrefixHash, previous.NetworkPrefixHash))
+	score.add("asn", 3, current.IP.ASN != 0 && previous.IP.ASN != 0, sameString(fmt.Sprint(current.IP.ASN), fmt.Sprint(previous.IP.ASN)))
+}
+
 func maximumWeight(mode Mode) (weight float64) {
 	if mode&ModeDevice != 0 {
 		weight += 78
@@ -150,8 +158,38 @@ func maximumWeight(mode Mode) (weight float64) {
 	return
 }
 
-func scoreCandidate(snapshot Snapshot, candidate MatchCandidate, mode Mode) (result CandidateScore) {
+// CalculateAggressiveness estimates privacy impact from the available fingerprint inputs.
+func CalculateAggressiveness(snapshot Snapshot, mode Mode) (result Aggressiveness) {
 	var score matcherScore
+
+	if mode&ModeDevice != 0 {
+		addDeviceEvidence(&score, snapshot.Browser, snapshot.Browser)
+	}
+
+	if mode&ModeBrowser != 0 {
+		addBrowserEvidence(&score, snapshot.Browser, snapshot.Browser)
+	}
+
+	addServerEvidence(&score, snapshot.Server, snapshot.Server)
+	score.add("ip-country", 2, snapshot.Server.IP.CountryCode != "", 1)
+	score.add("ip-city", 4, snapshot.Server.IP.City != "", 1)
+	result.SignalCount = len(score.evidence)
+	result.Score = int(math.Round(clamp(score.presentWeight/(maximumWeight(ModeDeviceAndBrowser)+17)) * 100))
+	result.Level = "low"
+	if result.Score >= 70 {
+		result.Level = "high"
+	} else if result.Score >= 35 {
+		result.Level = "moderate"
+	}
+
+	return
+}
+
+func scoreCandidate(snapshot Snapshot, candidate MatchCandidate, mode Mode) (result CandidateScore) {
+	var (
+		score   matcherScore
+		maximum float64 = maximumWeight(mode)
+	)
 
 	if mode&ModeDevice != 0 {
 		addDeviceEvidence(&score, snapshot.Browser, candidate.Signals)
@@ -161,9 +199,17 @@ func scoreCandidate(snapshot Snapshot, candidate MatchCandidate, mode Mode) (res
 		addBrowserEvidence(&score, snapshot.Browser, candidate.Signals)
 	}
 
+	addServerEvidence(&score, snapshot.Server, candidate.Server)
+	if snapshot.Server.NetworkPrefixHash != "" {
+		maximum += 8
+	}
+	if snapshot.Server.IP.ASN != 0 {
+		maximum += 3
+	}
+
 	result = CandidateScore{
 		VisitorID:     candidate.VisitorID,
-		Coverage:      clamp(score.presentWeight / maximumWeight(mode)),
+		Coverage:      clamp(score.presentWeight / maximum),
 		Evidence:      score.evidence,
 		SnapshotMatch: snapshot.SnapshotID == candidate.SnapshotID,
 	}
@@ -199,6 +245,10 @@ func MatchSnapshot(snapshot Snapshot, mode Mode, candidates []MatchCandidate) (r
 	sort.Slice(ranked, func(first, second int) bool { return ranked[first].Score > ranked[second].Score })
 
 	result.Decision = "new"
+	result.Aggressiveness = CalculateAggressiveness(snapshot, mode)
+	if snapshot.Server.IP.ASN != 0 || snapshot.Server.IP.CountryCode != "" {
+		result.IP = &snapshot.Server.IP
+	}
 	result.CandidateCount = len(ranked)
 	result.Margin = 1
 	if len(ranked) == 0 {

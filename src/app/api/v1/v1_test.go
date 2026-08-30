@@ -64,13 +64,13 @@ func TestChallengeRegistry(t *testing.T) {
 		t.Fatal("consumed challenge was accepted twice")
 	}
 
-	registry.challenges["expired"] = challengeRecord{expiresAt: now.Add(-time.Second), userAgent: "browser-a"}
+	registry.challenges["expired"] = challengeRecord{expiresAt: now.Add(-time.Second), binding: "browser-a"}
 	if registry.consume("expired", now, "browser-a") {
 		t.Fatal("expired challenge was accepted")
 	}
 
 	for index := 0; index < maximumChallenges; index++ {
-		registry.challenges[string(rune(index))] = challengeRecord{expiresAt: now.Add(time.Minute), userAgent: "browser-a"}
+		registry.challenges[string(rune(index))] = challengeRecord{expiresAt: now.Add(time.Minute), binding: "browser-a"}
 	}
 
 	if _, err = registry.issue(now, "browser-a"); err == nil {

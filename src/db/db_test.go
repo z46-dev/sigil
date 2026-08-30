@@ -106,3 +106,33 @@ func TestMatchAndRecord(t *testing.T) {
 		t.Fatalf("unexpected persistence state: fingerprints=%+v observations=%+v", fingerprints, observations)
 	}
 }
+
+// TestMatchAndRecordRetainsNetworkChanges verifies network evidence is not lost to snapshot deduplication.
+func TestMatchAndRecordRetainsNetworkChanges(t *testing.T) {
+	var (
+		testDriver   *gosqlite.Driver = initializeTestDatabase(t)
+		snapshot     service.Snapshot = databaseTestSnapshot(t)
+		observations []*service.Observation
+		err          error
+	)
+
+	defer testDriver.Close()
+
+	snapshot.Server.NetworkPrefixHash = "network-a"
+	if _, err = MatchAndRecord(snapshot); err != nil {
+		t.Fatalf("record first network: %v", err)
+	}
+
+	snapshot.Server.NetworkPrefixHash = "network-b"
+	if _, err = MatchAndRecord(snapshot); err != nil {
+		t.Fatalf("record changed network: %v", err)
+	}
+
+	if observations, err = Observations.SelectAll(); err != nil {
+		t.Fatalf("list observations: %v", err)
+	}
+
+	if len(observations) != 2 {
+		t.Fatalf("network change was deduplicated: observations=%+v", observations)
+	}
+}

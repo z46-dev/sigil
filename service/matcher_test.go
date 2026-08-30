@@ -147,3 +147,44 @@ func TestValidateSnapshotRejectsTampering(t *testing.T) {
 		t.Fatal("tampered snapshot unexpectedly validated")
 	}
 }
+
+// TestServerEvidenceAndAggressiveness verifies network evidence is measured without dominating a match.
+func TestServerEvidenceAndAggressiveness(t *testing.T) {
+	var (
+		signals  BrowserSignals = representativeSignals()
+		snapshot Snapshot       = snapshotForTest(t, signals, ModeDeviceAndBrowser)
+		result   MatchResult
+	)
+
+	snapshot.Server = ServerSignals{
+		NetworkPrefixHash: "network-a",
+		Protocol:          "HTTP/2",
+		TLS:               true,
+		IP: IPClassification{
+			ASN:             64500,
+			ASNOrganization: "Example Network",
+			CountryCode:     "US",
+			City:            "New York",
+		},
+	}
+	result = MatchSnapshot(snapshot, ModeDeviceAndBrowser, []MatchCandidate{{
+		VisitorID: "visitor-one",
+		Signals:   signals,
+		Server:    snapshot.Server,
+	}})
+
+	if result.Decision != "matched" || result.Aggressiveness.Level != "high" || result.Aggressiveness.Score != 100 {
+		t.Fatalf("server evidence was not reflected in the result: %+v", result)
+	}
+
+	var foundNetwork bool
+	for _, evidence := range result.Evidence {
+		if evidence.Name == "network-prefix" {
+			foundNetwork = true
+		}
+	}
+
+	if !foundNetwork {
+		t.Fatalf("network evidence is missing: %+v", result.Evidence)
+	}
+}
