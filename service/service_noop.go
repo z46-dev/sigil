@@ -16,3 +16,10 @@ func CollectAudio(snapshot Snapshot) (updated Snapshot, err error) {
 	err = fmt.Errorf("audio collection requires a js/wasm build")
 	return
 }
+
+// CollectWebGPU reports that WebGPU collection is only available in WebAssembly.
+func CollectWebGPU(snapshot Snapshot) (updated Snapshot, err error) {
+	updated = snapshot
+	err = fmt.Errorf("WebGPU collection requires a js/wasm build")
+	return
+}

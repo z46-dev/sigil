@@ -122,11 +122,14 @@ func addDeviceEvidence(score *matcherScore, current, previous BrowserSignals) {
 	score.add("screen-long-side", 5, currentLong > 0 && previousLong > 0, numericSimilarity(float64(currentLong), float64(previousLong), 240))
 	score.add("color-depth", 2, current.ColorDepth > 0 && previous.ColorDepth > 0, sameString(fmt.Sprint(current.ColorDepth), fmt.Sprint(previous.ColorDepth)))
 	score.add("pixel-ratio", 3, current.PixelRatio > 0 && previous.PixelRatio > 0, numericSimilarity(current.PixelRatio, previous.PixelRatio, 0.5))
-	score.add("cpu-count", 7, current.HardwareConcurrency > 0 && previous.HardwareConcurrency > 0, numericSimilarity(float64(current.HardwareConcurrency), float64(previous.HardwareConcurrency), 4))
-	score.add("device-memory", 6, current.DeviceMemory > 0 && previous.DeviceMemory > 0, numericSimilarity(current.DeviceMemory, previous.DeviceMemory, 4))
+	score.add("cpu-count", 2, current.HardwareConcurrency > 0 && previous.HardwareConcurrency > 0, numericSimilarity(float64(current.HardwareConcurrency), float64(previous.HardwareConcurrency), 4))
+	score.add("device-memory", 2, current.DeviceMemory > 0 && previous.DeviceMemory > 0, numericSimilarity(current.DeviceMemory, previous.DeviceMemory, 4))
 	score.add("touch-points", 5, current.MaxTouchPoints >= 0 && previous.MaxTouchPoints >= 0, numericSimilarity(float64(current.MaxTouchPoints), float64(previous.MaxTouchPoints), 2))
 	score.add("webgl-vendor", 7, current.Rendering.WebGLVendor != "" && previous.Rendering.WebGLVendor != "", sameString(current.Rendering.WebGLVendor, previous.Rendering.WebGLVendor))
 	score.add("webgl-renderer", 14, current.Rendering.WebGLRenderer != "" && previous.Rendering.WebGLRenderer != "", sameString(current.Rendering.WebGLRenderer, previous.Rendering.WebGLRenderer))
+	score.add("webgpu-vendor", 4, current.Rendering.WebGPUVendor != "" && previous.Rendering.WebGPUVendor != "", sameString(current.Rendering.WebGPUVendor, previous.Rendering.WebGPUVendor))
+	score.add("webgpu-architecture", 5, current.Rendering.WebGPUArchitecture != "" && previous.Rendering.WebGPUArchitecture != "", sameString(current.Rendering.WebGPUArchitecture, previous.Rendering.WebGPUArchitecture))
+	score.add("webgpu-device", 8, current.Rendering.WebGPUDevice != "" && previous.Rendering.WebGPUDevice != "", sameString(current.Rendering.WebGPUDevice, previous.Rendering.WebGPUDevice))
 	score.add("font-set", 10, current.Fonts.DetectedHash != "" && previous.Fonts.DetectedHash != "", sameString(current.Fonts.DetectedHash, previous.Fonts.DetectedHash))
 }
 
@@ -137,6 +140,10 @@ func addBrowserEvidence(score *matcherScore, current, previous BrowserSignals) {
 	score.add("timezone", 3, current.Timezone != "" && previous.Timezone != "", sameString(current.Timezone, previous.Timezone))
 	score.add("canvas", 12, current.Rendering.CanvasHash != "" && previous.Rendering.CanvasHash != "", sameString(current.Rendering.CanvasHash, previous.Rendering.CanvasHash))
 	score.add("webgl-extensions", 6, current.Rendering.WebGLExtensionsHash != "" && previous.Rendering.WebGLExtensionsHash != "", sameString(current.Rendering.WebGLExtensionsHash, previous.Rendering.WebGLExtensionsHash))
+	score.add("webgpu-features", 3, current.Rendering.WebGPUFeaturesHash != "" && previous.Rendering.WebGPUFeaturesHash != "", sameString(current.Rendering.WebGPUFeaturesHash, previous.Rendering.WebGPUFeaturesHash))
+	score.add("webgpu-limits", 4, current.Rendering.WebGPULimitsHash != "" && previous.Rendering.WebGPULimitsHash != "", sameString(current.Rendering.WebGPULimitsHash, previous.Rendering.WebGPULimitsHash))
+	score.add("webgpu-render", 10, current.Rendering.WebGPURenderHash != "" && previous.Rendering.WebGPURenderHash != "", sameString(current.Rendering.WebGPURenderHash, previous.Rendering.WebGPURenderHash))
+	score.add("webgpu-compute", 8, current.Rendering.WebGPUComputeHash != "" && previous.Rendering.WebGPUComputeHash != "", sameString(current.Rendering.WebGPUComputeHash, previous.Rendering.WebGPUComputeHash))
 	score.add("audio", 9, current.Audio.Hash != "" && previous.Audio.Hash != "", sameString(current.Audio.Hash, previous.Audio.Hash))
 	score.add("font-metrics", 7, current.Fonts.MetricsHash != "" && previous.Fonts.MetricsHash != "", sameString(current.Fonts.MetricsHash, previous.Fonts.MetricsHash))
 }
@@ -148,11 +155,11 @@ func addServerEvidence(score *matcherScore, current, previous ServerSignals) {
 
 func maximumWeight(mode Mode) (weight float64) {
 	if mode&ModeDevice != 0 {
-		weight += 78
+		weight += 86
 	}
 
 	if mode&ModeBrowser != 0 {
-		weight += 55
+		weight += 80
 	}
 
 	return

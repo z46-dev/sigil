@@ -10,18 +10,19 @@ import (
 
 type (
 	deviceIdentityInput struct {
-		Platform            string  `json:"platform"`
-		ScreenShortSide     int     `json:"screenShortSide"`
-		ScreenLongSide      int     `json:"screenLongSide"`
-		ColorDepth          int     `json:"colorDepth"`
-		PixelRatio          float64 `json:"pixelRatio"`
-		HardwareConcurrency int     `json:"hardwareConcurrency"`
-		DeviceMemory        float64 `json:"deviceMemory"`
-		MaxTouchPoints      int     `json:"maxTouchPoints"`
-		WebGLVendor         string  `json:"webglVendor"`
-		WebGLRenderer       string  `json:"webglRenderer"`
-		FontCount           int     `json:"fontCount"`
-		FontsHash           string  `json:"fontsHash"`
+		Platform           string  `json:"platform"`
+		ScreenShortSide    int     `json:"screenShortSide"`
+		ScreenLongSide     int     `json:"screenLongSide"`
+		ColorDepth         int     `json:"colorDepth"`
+		PixelRatio         float64 `json:"pixelRatio"`
+		MaxTouchPoints     int     `json:"maxTouchPoints"`
+		WebGLVendor        string  `json:"webglVendor"`
+		WebGLRenderer      string  `json:"webglRenderer"`
+		WebGPUVendor       string  `json:"webgpuVendor"`
+		WebGPUArchitecture string  `json:"webgpuArchitecture"`
+		WebGPUDevice       string  `json:"webgpuDevice"`
+		FontCount          int     `json:"fontCount"`
+		FontsHash          string  `json:"fontsHash"`
 	}
 
 	browserIdentityInput struct {
@@ -36,6 +37,10 @@ type (
 		SessionStorage      bool         `json:"sessionStorage"`
 		CanvasHash          string       `json:"canvasHash"`
 		WebGLExtensionsHash string       `json:"webglExtensionsHash"`
+		WebGPUFeaturesHash  string       `json:"webgpuFeaturesHash"`
+		WebGPULimitsHash    string       `json:"webgpuLimitsHash"`
+		WebGPURenderHash    string       `json:"webgpuRenderHash"`
+		WebGPUComputeHash   string       `json:"webgpuComputeHash"`
 		Audio               AudioSignals `json:"audio"`
 		FontMetricsHash     string       `json:"fontMetricsHash"`
 	}
@@ -95,11 +100,12 @@ func deviceIdentity(signals BrowserSignals) (identity deviceIdentityInput) {
 	identity.Platform = signals.Platform
 	identity.ColorDepth = signals.ColorDepth
 	identity.PixelRatio = signals.PixelRatio
-	identity.HardwareConcurrency = signals.HardwareConcurrency
-	identity.DeviceMemory = signals.DeviceMemory
 	identity.MaxTouchPoints = signals.MaxTouchPoints
 	identity.WebGLVendor = signals.Rendering.WebGLVendor
 	identity.WebGLRenderer = signals.Rendering.WebGLRenderer
+	identity.WebGPUVendor = signals.Rendering.WebGPUVendor
+	identity.WebGPUArchitecture = signals.Rendering.WebGPUArchitecture
+	identity.WebGPUDevice = signals.Rendering.WebGPUDevice
 	identity.FontCount = signals.Fonts.DetectedCount
 	identity.FontsHash = signals.Fonts.DetectedHash
 
@@ -119,6 +125,10 @@ func browserIdentity(signals BrowserSignals) (identity browserIdentityInput) {
 		SessionStorage:      signals.SessionStorage,
 		CanvasHash:          signals.Rendering.CanvasHash,
 		WebGLExtensionsHash: signals.Rendering.WebGLExtensionsHash,
+		WebGPUFeaturesHash:  signals.Rendering.WebGPUFeaturesHash,
+		WebGPULimitsHash:    signals.Rendering.WebGPULimitsHash,
+		WebGPURenderHash:    signals.Rendering.WebGPURenderHash,
+		WebGPUComputeHash:   signals.Rendering.WebGPUComputeHash,
 		Audio:               signals.Audio,
 		FontMetricsHash:     signals.Fonts.MetricsHash,
 	}

@@ -26,6 +26,14 @@ func representativeSignals() (signals BrowserSignals) {
 			WebGLVendor:         "GPU Vendor",
 			WebGLRenderer:       "GPU Renderer",
 			WebGLExtensionsHash: "extensions",
+			WebGPUSupported:     true,
+			WebGPUVendor:        "GPU Vendor",
+			WebGPUArchitecture:  "GPU Architecture",
+			WebGPUDevice:        "GPU Device",
+			WebGPUFeaturesHash:  "gpu-features",
+			WebGPULimitsHash:    "gpu-limits",
+			WebGPURenderHash:    "gpu-render",
+			WebGPUComputeHash:   "gpu-compute",
 		},
 		Audio: AudioSignals{
 			Supported: true,
@@ -69,6 +77,10 @@ func TestMatchSnapshotAcrossBrowsers(t *testing.T) {
 	current.Vendor = "Other Vendor"
 	current.Rendering.CanvasHash = "other-canvas"
 	current.Rendering.WebGLExtensionsHash = "other-extensions"
+	current.Rendering.WebGPUFeaturesHash = "other-gpu-features"
+	current.Rendering.WebGPULimitsHash = "other-gpu-limits"
+	current.Rendering.WebGPURenderHash = "other-gpu-render"
+	current.Rendering.WebGPUComputeHash = "other-gpu-compute"
 	current.Audio.Hash = "other-audio"
 	current.Fonts.MetricsHash = "other-metrics"
 
@@ -81,6 +93,45 @@ func TestMatchSnapshotAcrossBrowsers(t *testing.T) {
 
 	if result.Confidence < 0.9 {
 		t.Fatalf("cross-browser confidence is unexpectedly low: %f", result.Confidence)
+	}
+}
+
+// TestMatchSnapshotAcrossBravePrivateMode verifies farbled hardware values do not displace stable device evidence.
+func TestMatchSnapshotAcrossBravePrivateMode(t *testing.T) {
+	var (
+		regular     BrowserSignals = representativeSignals()
+		private     BrowserSignals = regular
+		distractor  BrowserSignals
+		regularID   string
+		privateID   string
+		result      MatchResult
+		err         error
+		identifyErr error
+	)
+
+	regular.HardwareConcurrency = 2
+	regular.DeviceMemory = 0.5
+	private.HardwareConcurrency = 11
+	private.DeviceMemory = 8
+	private.Rendering.CanvasHash = "private-canvas"
+	private.Audio.Hash = "private-audio"
+	distractor = private
+	distractor.ScreenWidth = 1280
+	distractor.ScreenHeight = 720
+
+	if regularID, err = IdentifySnapshotForMode(regular, ModeDevice); err != nil {
+		t.Fatalf("identify regular Brave snapshot: %v", err)
+	}
+	if privateID, identifyErr = IdentifySnapshotForMode(private, ModeDevice); identifyErr != nil || privateID != regularID {
+		t.Fatalf("Brave private mode changed the device key: regular=%q private=%q err=%v", regularID, privateID, identifyErr)
+	}
+
+	result = MatchSnapshot(snapshotForTest(t, private, ModeDevice), ModeDevice, []MatchCandidate{
+		{VisitorID: "regular-visitor", SnapshotID: regularID, Signals: regular},
+		{VisitorID: "distractor", Signals: distractor},
+	})
+	if result.Decision != "matched" || result.VisitorID != "regular-visitor" || result.Collision {
+		t.Fatalf("Brave private observation did not match its regular visitor: %+v", result)
 	}
 }
 
@@ -125,6 +176,9 @@ func TestMatchSnapshotCreatesNewIdentity(t *testing.T) {
 	current.MaxTouchPoints = 5
 	current.Rendering.WebGLVendor = "Other GPU Vendor"
 	current.Rendering.WebGLRenderer = "Other GPU Renderer"
+	current.Rendering.WebGPUVendor = "Other WebGPU Vendor"
+	current.Rendering.WebGPUArchitecture = "Other WebGPU Architecture"
+	current.Rendering.WebGPUDevice = "Other WebGPU Device"
 	current.Fonts.DetectedHash = "other-fonts"
 
 	if result = MatchSnapshot(snapshotForTest(t, current, ModeDevice), ModeDevice, []MatchCandidate{{

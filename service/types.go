@@ -26,6 +26,15 @@ type (
 		WebGLVendor         string `json:"webglVendor"`
 		WebGLRenderer       string `json:"webglRenderer"`
 		WebGLExtensionsHash string `json:"webglExtensionsHash"`
+		WebGPUSupported     bool   `json:"webgpuSupported"`
+		WebGPUVendor        string `json:"webgpuVendor"`
+		WebGPUArchitecture  string `json:"webgpuArchitecture"`
+		WebGPUDevice        string `json:"webgpuDevice"`
+		WebGPUDescription   string `json:"webgpuDescription"`
+		WebGPUFeaturesHash  string `json:"webgpuFeaturesHash"`
+		WebGPULimitsHash    string `json:"webgpuLimitsHash"`
+		WebGPURenderHash    string `json:"webgpuRenderHash"`
+		WebGPUComputeHash   string `json:"webgpuComputeHash"`
 	}
 
 	// IPClassification contains server-derived network ownership and location data.
@@ -114,7 +123,7 @@ type (
 	}
 )
 
-const SchemaVersion int = 3
+const SchemaVersion int = 4
 
 const (
 	ModeDevice Mode = 1 << iota

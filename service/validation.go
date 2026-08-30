@@ -28,7 +28,11 @@ func ValidateSnapshot(snapshot Snapshot) (mode Mode, err error) {
 	if !validText(snapshot.Browser.UserAgent, 1024) || !validText(snapshot.Browser.Platform, 128) ||
 		!validText(snapshot.Browser.Vendor, 256) || !validText(snapshot.Browser.Timezone, 128) ||
 		!validText(snapshot.Browser.DoNotTrack, 64) || !validText(snapshot.Browser.Rendering.WebGLVendor, 512) ||
-		!validText(snapshot.Browser.Rendering.WebGLRenderer, 1024) {
+		!validText(snapshot.Browser.Rendering.WebGLRenderer, 1024) ||
+		!validText(snapshot.Browser.Rendering.WebGPUVendor, 512) ||
+		!validText(snapshot.Browser.Rendering.WebGPUArchitecture, 512) ||
+		!validText(snapshot.Browser.Rendering.WebGPUDevice, 512) ||
+		!validText(snapshot.Browser.Rendering.WebGPUDescription, 1024) {
 		err = fmt.Errorf("browser metadata exceeds size limits")
 		return
 	}
@@ -46,7 +50,11 @@ func ValidateSnapshot(snapshot Snapshot) (mode Mode, err error) {
 	}
 
 	if len(snapshot.SnapshotID) > 128 || !validHash(snapshot.Browser.Rendering.CanvasHash) ||
-		!validHash(snapshot.Browser.Rendering.WebGLExtensionsHash) || !validHash(snapshot.Browser.Audio.Hash) ||
+		!validHash(snapshot.Browser.Rendering.WebGLExtensionsHash) ||
+		!validHash(snapshot.Browser.Rendering.WebGPUFeaturesHash) ||
+		!validHash(snapshot.Browser.Rendering.WebGPULimitsHash) ||
+		!validHash(snapshot.Browser.Rendering.WebGPURenderHash) ||
+		!validHash(snapshot.Browser.Rendering.WebGPUComputeHash) || !validHash(snapshot.Browser.Audio.Hash) ||
 		!validHash(snapshot.Browser.Fonts.DetectedHash) || !validHash(snapshot.Browser.Fonts.MetricsHash) {
 		err = fmt.Errorf("signal hash exceeds size limit")
 		return

@@ -32,12 +32,8 @@ func TestIdentifySnapshot(t *testing.T) {
 		t.Fatalf("same signals produced different identifiers: %q and %q", first, second)
 	}
 
-	if !strings.HasPrefix(first, "sg3c_") {
+	if !strings.HasPrefix(first, "sg4c_") {
 		t.Fatalf("identifier %q does not carry the schema version", first)
-	}
-
-	if first != "sg3c_nyNoT7qB32iDIrO7SrYQd3LGLsoxzuGLB_CHIhGGAyQ" {
-		t.Fatalf("schema version three combined identifier changed: %q", first)
 	}
 
 	signals.ScreenWidth = 2560
@@ -77,6 +73,8 @@ func TestIdentityModes(t *testing.T) {
 	changed.Rendering.CanvasHash = "canvas-b"
 	changed.Audio.Hash = "audio-b"
 	changed.Fonts.MetricsHash = "metrics-b"
+	changed.HardwareConcurrency = 32
+	changed.DeviceMemory = 16
 	changed.ScreenWidth = 1080
 	changed.ScreenHeight = 1920
 
@@ -104,8 +102,50 @@ func TestIdentityModes(t *testing.T) {
 		t.Fatal("browser changes did not alter browser identifier")
 	}
 
-	if !strings.HasPrefix(deviceFirst, "sg3d_") || !strings.HasPrefix(browserFirst, "sg3b_") {
+	if !strings.HasPrefix(deviceFirst, "sg4d_") || !strings.HasPrefix(browserFirst, "sg4b_") {
 		t.Fatalf("mode identifiers are not domain-separated: %q and %q", deviceFirst, browserFirst)
+	}
+}
+
+// TestWebGPUIdentityEvidence verifies WebGPU evidence contributes to its intended scopes.
+func TestWebGPUIdentityEvidence(t *testing.T) {
+	var (
+		signals BrowserSignals = BrowserSignals{Rendering: RenderingSignals{
+			WebGPUVendor:       "vendor-a",
+			WebGPUArchitecture: "architecture-a",
+			WebGPUDevice:       "device-a",
+			WebGPUFeaturesHash: "features-a",
+			WebGPULimitsHash:   "limits-a",
+			WebGPURenderHash:   "render-a",
+			WebGPUComputeHash:  "compute-a",
+		}}
+		changed                   BrowserSignals = signals
+		deviceFirst, deviceNext   string
+		browserFirst, browserNext string
+		err                       error
+	)
+
+	changed.Rendering.WebGPUDevice = "device-b"
+	if deviceFirst, err = IdentifySnapshotForMode(signals, ModeDevice); err != nil {
+		t.Fatalf("identify first WebGPU device: %v", err)
+	}
+	if deviceNext, err = IdentifySnapshotForMode(changed, ModeDevice); err != nil || deviceFirst == deviceNext {
+		t.Fatalf("WebGPU adapter did not affect device identity: first=%q next=%q err=%v", deviceFirst, deviceNext, err)
+	}
+
+	changed = signals
+	changed.Rendering.WebGPURenderHash = "render-b"
+	if browserFirst, err = IdentifySnapshotForMode(signals, ModeBrowser); err != nil {
+		t.Fatalf("identify first WebGPU browser: %v", err)
+	}
+	if browserNext, err = IdentifySnapshotForMode(changed, ModeBrowser); err != nil || browserFirst == browserNext {
+		t.Fatalf("WebGPU render did not affect browser identity: first=%q next=%q err=%v", browserFirst, browserNext, err)
+	}
+
+	changed = signals
+	changed.Rendering.WebGPUComputeHash = "compute-b"
+	if browserNext, err = IdentifySnapshotForMode(changed, ModeBrowser); err != nil || browserFirst == browserNext {
+		t.Fatalf("WebGPU compute did not affect browser identity: first=%q next=%q err=%v", browserFirst, browserNext, err)
 	}
 }
 

@@ -181,3 +181,28 @@ func CollectAudio(snapshot Snapshot) (updated Snapshot, err error) {
 
 	return
 }
+
+// CollectWebGPU adds asynchronous WebGPU evidence and refreshes the snapshot identifier.
+func CollectWebGPU(snapshot Snapshot) (updated Snapshot, err error) {
+	var (
+		webGPU      RenderingSignals
+		identifyErr error
+	)
+
+	updated = snapshot
+	webGPU, err = collectWebGPU(js.Global())
+	updated.Browser.Rendering.WebGPUSupported = webGPU.WebGPUSupported
+	updated.Browser.Rendering.WebGPUVendor = webGPU.WebGPUVendor
+	updated.Browser.Rendering.WebGPUArchitecture = webGPU.WebGPUArchitecture
+	updated.Browser.Rendering.WebGPUDevice = webGPU.WebGPUDevice
+	updated.Browser.Rendering.WebGPUDescription = webGPU.WebGPUDescription
+	updated.Browser.Rendering.WebGPUFeaturesHash = webGPU.WebGPUFeaturesHash
+	updated.Browser.Rendering.WebGPULimitsHash = webGPU.WebGPULimitsHash
+	updated.Browser.Rendering.WebGPURenderHash = webGPU.WebGPURenderHash
+	updated.Browser.Rendering.WebGPUComputeHash = webGPU.WebGPUComputeHash
+	if updated.SnapshotID, identifyErr = IdentifySnapshotForMode(updated.Browser, updated.mode); identifyErr != nil {
+		err = identifyErr
+	}
+
+	return
+}

@@ -68,6 +68,10 @@ func performCollection(resolve, reject js.Value, mode service.Mode) {
 		log.Infof("Audio probe unavailable: %v", err)
 	}
 
+	if snapshot, err = service.CollectWebGPU(snapshot); err != nil {
+		log.Infof("WebGPU probe unavailable: %v", err)
+	}
+
 	if snapshot, err = service.ApplyMode(snapshot, mode); err != nil {
 		reject.Invoke(js.Global().Get("Error").New(err.Error()))
 		return
