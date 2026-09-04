@@ -9,7 +9,7 @@ require (
 	github.com/z46-dev/goconf v0.0.0-20260527232714-5c4e1d4a89e7
 	github.com/z46-dev/golog v0.0.0-20260324172018-d1a87bbdeb64
 	github.com/z46-dev/gosqlite v0.0.0-20260719175548-e15201acdb53
-	modernc.org/sqlite v1.57.0
+	modernc.org/sqlite v1.58.0
 )
 
 require (
