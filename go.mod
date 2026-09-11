@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/gaissmai/bart v0.29.0
 	github.com/gofiber/fiber/v3 v3.5.0
-	github.com/oschwald/maxminddb-golang/v2 v2.5.0
+	github.com/oschwald/maxminddb-golang/v2 v2.6.0
 	github.com/z46-dev/goconf v0.0.0-20260527232714-5c4e1d4a89e7
 	github.com/z46-dev/golog v0.0.0-20260324172018-d1a87bbdeb64
 	github.com/z46-dev/gosqlite v0.0.0-20260719175548-e15201acdb53
