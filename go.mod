@@ -3,7 +3,7 @@ module github.com/z46-dev/sigil
 go 1.26.2
 
 require (
-	github.com/gaissmai/bart v0.29.0
+	github.com/gaissmai/bart v0.30.0
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/oschwald/maxminddb-golang/v2 v2.5.0
 	github.com/z46-dev/goconf v0.0.0-20260527232714-5c4e1d4a89e7
